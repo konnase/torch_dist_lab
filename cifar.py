@@ -8,6 +8,7 @@ import argparse
 import os
 import shutil
 import time
+import datetime
 import random
 
 import torch
@@ -64,7 +65,7 @@ parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet20',
                     help='model architecture: ' +
                         ' | '.join(model_names) +
                         ' (default: resnet18)')
-parser.add_argument('--depth', type=int, default=29, help='Model depth.')
+parser.add_argument('--depth', type=int, default=56, help='Model depth.')
 parser.add_argument('--block-name', type=str, default='BasicBlock',
                     help='the building block for Resnet and Preresnet: BasicBlock, Bottleneck (default: Basicblock for cifar10/cifar100)')
 parser.add_argument('--cardinality', type=int, default=8, help='Model cardinality (group).')
@@ -182,6 +183,8 @@ def main():
         test_loss, test_acc = test(testloader, model, criterion, epoch, use_cuda)
         print('Rank:{} Epoch[{}/{}]: LR: {:.3f}, Train loss: {:.5f}, Test loss: {:.5f}, Train acc: {:.2f}, Test acc: {:.2f}.'.format(dist.get_rank(),epoch+1, args.epochs, state['lr'], 
         train_loss, test_loss, train_acc, test_acc))
+        # print('Rank:{} Epoch[{}/{}]: LR: {:.3f}, Train loss: {:.5f}, Train acc: {:.2f}'.format(dist.get_rank(),epoch+1, args.epochs, state['lr'],train_loss, train_acc))
+        
 
 def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
     # switch to train mode
@@ -247,4 +250,8 @@ def adjust_learning_rate(optimizer, epoch):
             param_group['lr'] = state['lr']
 
 if __name__ == '__main__':
+    start = datetime.datetime.now()
     main()
+    end = datetime.datetime.now()
+    delta = end-start
+    print("Time elapsed: %d s." % delta.seconds)
