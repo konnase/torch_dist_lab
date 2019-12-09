@@ -4,9 +4,16 @@
 可以选择直接执行python文件来运行，但是参数多，而且复杂，因此提供了launcher脚本来简化运行步骤。launcher.sh使用方法:
 ``` shell
 # 使用GPU 0 1 2 3 来分布式训练alexnet，可选的模型见下一部分：直接执行python文件手动运行
-./launcher.sh -m alexnet -n 4 -g 0,1,2,3 -d cifar100
+./launcher.sh -m alexnet -n 4 -g 0,1,2,3 -d cifar100 -f dist
 ```
-### 2. 直接执行python文件手动运行
+### 3. Horovod
+
+``` shell
+CUDA_VISIBLE_DEVICES=$Gpus horovodrun -np $Num -H localhost:$Num python3.5 cifar_horovod.py -a $Model --epochs 164 --schedule 81 122 -d $Dataset --gamma 0.1
+```
+
+### 2. Torch.distributed
+
 在python指令中，使用CUDA_VISIBLE_DEVICES来分配GPU，注意，分配的GPU个数应该和--nproc_per_node相同
 #### AlexNet
 ```
