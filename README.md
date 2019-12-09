@@ -157,5 +157,5 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 horovodrun -np 4 -H localhost:4 python3.5 train.py 
 
 ## 效果对比
 
-
+![image](./doc/fig4.png)
 
