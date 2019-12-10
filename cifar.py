@@ -125,11 +125,11 @@ def main():
         num_classes = 100
 
 
-    trainset = dataloader(root='/data/cifar', train=True, download=True, transform=transform_train)
+    trainset = dataloader(root='/data/share/cifar', train=True, download=True, transform=transform_train)
     sampler = torch.utils.data.distributed.DistributedSampler(trainset)
     trainloader = data.DataLoader(dataset=trainset, batch_size=args.train_batch, shuffle=False, sampler=sampler)
 
-    testset = dataloader(root='/data/cifar', train=False, download=False, transform=transform_test)
+    testset = dataloader(root='/data/share/cifar', train=False, download=False, transform=transform_test)
     testloader = data.DataLoader(testset, batch_size=args.test_batch, shuffle=False, num_workers=args.workers)
 
     # Model
