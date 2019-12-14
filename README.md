@@ -72,7 +72,9 @@ def main():
     trainloader = data.DataLoader(dataset=trainset, batch_size=args.train_batch, shuffle=False, sampler=sampler)
 		# 测试集
     testset = ...
-    testloader = data.DataLoader(testset, batch_size=args.test_batch, shuffle=False, num_workers=args.workers)
+    # 在分布式训练中，一个batch会被划分为几等份，分配给每个GPU进行训练。
+    # 因此，batch_size需要乘上GPU的个数
+    testloader = data.DataLoader(testset, batch_size=args.test_batch * dist.get_world_size(), shuffle=False, num_workers=args.workers)
     # 准备模型
     model = ...
     # 将模型放在自己的rank对应的cuda上
@@ -122,7 +124,7 @@ def main():
     trainloader = data.DataLoader(dataset=trainset, batch_size=args.train_batch, shuffle=False, sampler=sampler)
 		# 测试集
     testset = ...
-    testloader = data.DataLoader(testset, batch_size=args.test_batch, shuffle=False, num_workers=args.workers)
+    testloader = data.DataLoader(testset, batch_size=args.test_batch * hvd.size(), shuffle=False, num_workers=args.workers)
     # 准备模型
 		model=...
     # 将模型放到指定cuda
