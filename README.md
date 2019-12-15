@@ -1,4 +1,4 @@
-# 使用DistributedDataParallel(DDP)和Horovod两种ring-allreduce分布式训练框架(单机多卡)
+# DDP, Horovod, 单机多卡和多机多卡对比
 
 ## ring-allreduce简介
 
@@ -46,7 +46,7 @@ ring-allreduce分为两个步骤，分别是**The Scatter-Reduce**和**The Allga
 
 ## 两种框架的使用
 
-### DDP
+### DDP(单机多卡)
 
 Pytorch的torch.distributed模块中封装了ring-allreduce算法，是官方推荐的分布式训练方法。使用它的具体模式如下：
 
@@ -78,6 +78,7 @@ def main():
     # 准备模型
     model = ...
     # 将模型放在自己的rank对应的cuda上
+    # 这里是一个映射关系，cuda[local_rank]会被映射到对应的visible device。
     device = torch.device('cuda', local_rank)
     model = model.to(device)
     # 并行化
@@ -157,7 +158,105 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 horovodrun -np 4 -H localhost:4 python3.5 train.py 
 
 
 
+### DDP 多机多卡
+
+在多机多卡中，由于涉及到多个主机之间的通信，所以在<code>dist.init_progress_group()</code>的init_method参数中，需要指定多个进程如何进行通信。init_method有两种初始化方法:
+
++ 使用TCP初始化：
+
+  ``` python
+  torch.distributed.init_process_group(backend='nccl',
+                                       init_method="tcp://210.28.134.32:29998",
+                                       rank=local_rank, 
+                                       world_size=world_size)
+  ```
+
++ 使用共享文件系统初始化
+
+  ``` python
+  torch.distributed.init_process_group(backend='nccl',
+                                       init_method="file:///data/share/sharedfile",
+                                       rank=local_rank, 
+                                       world_size=world_size)
+  ```
+
+  注意，不管是哪种初始化方法，都需要提供rank和world_size。在TCP初始化中，rank为0的节点作为主节点，init_method中的IP地址对应主节点的IP地址。world_size指定一共需要的进程个数，在启动的进程数目达到world_size之前，<code>init_prpcess_group</code>将会阻塞。
+
+代码模式：
+
+``` python
+import torch
+import torch.distributed as dist
+
+def my_init():
+    # GPU allocation
+    global local_rank
+    global gpu_id
+    # 在使用torch.distributed.launch启动时，gpu_id就是rank
+    # 但是在多节点情况下，需要手动设置
+    world_size = args.wz
+    gpu_id = args.gpu_id
+    local_rank = args.local_rank
+    torch.cuda.set_device(gpu_id) # 设定cuda的默认GPU，每个rank不同
+    torch.distributed.init_process_group(backend='nccl',init_method="tcp://210.28.134.32:29998" ,rank=local_rank, world_size=world_size)
+
+def main():
+    trainset = ...
+    sampler = torch.utils.data.distributed.DistributedSampler(trainset)
+    trainloader = data.DataLoader(dataset=trainset, batch_size=args.train_batch * dist.get_world_size(), shuffle=False, sampler=sampler)
+    testset = ...
+    testloader = data.DataLoader(testset, batch_size=args.test_batch * dist.get_world_size(), shuffle=False, num_workers=args.workers)
+
+    # Model
+    
+		model = ...
+    device = torch.device('cuda', gpu_id)
+    model = model.to(device)
+    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu_id], output_device=gpu_id)    
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+
+
+    # Train and val
+    for epoch in range(start_epoch, args.epochs):
+        train...
+        eval...
+
+if __name__ == '__main__':
+    my_init()
+    main()
+
+```
+
+训练启动：
+
+使用DDP进行多机多卡分布式训练的启动过程比较繁琐，需要手动逐个启动每个进程。
+
+``` shell
+#host1
+python train.py --local-rank 0 --world-size 4 --gpu-id 2 [other args]
+python train.py --local-rank 1 --world-size 4 --gpu-id 3 [other args]
+#host2
+python train.py --local-rank 2 --world-size 4 --gpu-id 7 [other args]
+python train.py --local-rank 3 --world-size 4 --gpu-id 8 [other args]
+```
+
+
+
+### Horovod 多机多卡
+
+horovod多机多卡不需要对代码进行任何修改，只需要运行至指定多个host和每个host的进程数目即可
+
+``` shell
+CUDA_VISIBLE_DEVICES=0,1 horovodrun -np 4 -H host1:2,host2:2 python train.py [other args]
+```
+
+
+
+
+
 ## 效果对比
 
 ![image](./doc/fig4.png)
 
+经过测试发现，多台机器之间训练的速度非常慢，对于参数较多的模型，速度比单机还要慢，可能是受限于网络的传输速度。
