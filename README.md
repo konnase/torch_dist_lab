@@ -99,7 +99,7 @@ if __name__ == '__main__':
 训练时，需要在指令中分配GPU，确定进程个数等，训练指令可以是：
 
 ``` shell
-CUDA_VISIBLE_DEVICES=0,1,2,3  python3.5 -m torch.distributed.launch --nproc_per_node=4 train.py [other arguments]
+CUDA_VISIBLE_DEVICES=0,1,2,3  python3.5 -m torch.distributed.launch --nproc_per_node=4 cifar.py [other arguments]
 ```
 
 ### horovod
@@ -153,7 +153,7 @@ if __name__ == '__main__':
 训练时也需要在指令中分配GPU，确定进程个数
 
 ``` shell
-CUDA_VISIBLE_DEVICES=0,1,2,3 horovodrun -np 4 -H localhost:4 python3.5 train.py [other arguments]
+CUDA_VISIBLE_DEVICES=0,1,2,3 horovodrun -np 4 -H localhost:4 python3.5 cifar_horovod.py [other arguments]
 ```
 
 
@@ -234,11 +234,11 @@ if __name__ == '__main__':
 
 ``` shell
 #host1
-python train.py --local-rank 0 --world-size 4 --gpu-id 2 [other args]
-python train.py --local-rank 1 --world-size 4 --gpu-id 3 [other args]
+python cifar_multi_nodes.py --local-rank 0 --world-size 4 --gpu-id 2 [other args]
+python cifar_multi_nodes.py --local-rank 1 --world-size 4 --gpu-id 3 [other args]
 #host2
-python train.py --local-rank 2 --world-size 4 --gpu-id 7 [other args]
-python train.py --local-rank 3 --world-size 4 --gpu-id 8 [other args]
+python cifar_multi_nodes.py --local-rank 2 --world-size 4 --gpu-id 7 [other args]
+python cifar_multi_nodes.py --local-rank 3 --world-size 4 --gpu-id 8 [other args]
 ```
 
 
@@ -248,7 +248,7 @@ python train.py --local-rank 3 --world-size 4 --gpu-id 8 [other args]
 horovod多机多卡不需要对代码进行任何修改，只需要运行至指定多个host和每个host的进程数目即可
 
 ``` shell
-CUDA_VISIBLE_DEVICES=0,1 horovodrun -np 4 -H host1:2,host2:2 python train.py [other args]
+CUDA_VISIBLE_DEVICES=0,1 horovodrun -np 4 -H host1:2,host2:2 python cifar_horovod.py [other args]
 ```
 
 
