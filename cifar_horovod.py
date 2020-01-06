@@ -228,10 +228,11 @@ def test(testloader, model, criterion, epoch, use_cuda):
     for batch_idx, (inputs, targets) in enumerate(testloader):
         if use_cuda:
             inputs, targets = inputs.cuda(local_rank), targets.cuda(local_rank)
-        inputs, targets = torch.autograd.Variable(inputs, volatile=True), torch.autograd.Variable(targets)
+        inputs, targets = torch.autograd.Variable(inputs), torch.autograd.Variable(targets)
 
         # compute output
-        outputs = model(inputs)
+        with torch.no_grad():
+            outputs = model(inputs)
         loss = criterion(outputs, targets)
 
         # measure accuracy and record loss
