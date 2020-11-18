@@ -60,7 +60,7 @@ parser.add_argument('-c', '--checkpoint', default='checkpoint', type=str, metava
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 # Architecture
-parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet20',
+parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet50',
                     choices=model_names,
                     help='model architecture: ' +
                         ' | '.join(model_names) +
@@ -125,11 +125,11 @@ def main():
         num_classes = 100
 
 
-    trainset = dataloader(root='/data/share/cifar', train=True, download=True, transform=transform_train)
+    trainset = dataloader(root='./cifar', train=True, download=True, transform=transform_train)
     sampler = torch.utils.data.distributed.DistributedSampler(trainset)
     trainloader = data.DataLoader(dataset=trainset, batch_size=args.train_batch, shuffle=False, sampler=sampler)
 
-    testset = dataloader(root='/data/share/cifar', train=False, download=False, transform=transform_test)
+    testset = dataloader(root='./cifar', train=False, download=False, transform=transform_test)
     testloader = data.DataLoader(testset, batch_size=args.test_batch, shuffle=False, num_workers=args.workers)
 
     # Model
@@ -157,8 +157,8 @@ def main():
                     widen_factor=args.widen_factor,
                     dropRate=args.drop,
                 )
-    elif args.arch.endswith('resnet'):
-        model = models.__dict__[args.arch](
+    elif args.arch.startswith('resnet'):
+        model = models.__dict__['resnet'](
                     num_classes=num_classes,
                     depth=args.depth,
                     block_name=args.block_name,
@@ -196,7 +196,7 @@ def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
     for batch_idx, (inputs, targets) in enumerate(trainloader):
        
         if use_cuda:
-            inputs, targets = inputs.cuda(local_rank), targets.cuda(local_rank, async=True)
+            inputs, targets = inputs.cuda(local_rank), targets.cuda(local_rank)
         inputs, targets = torch.autograd.Variable(inputs), torch.autograd.Variable(targets)
 
         # compute output
