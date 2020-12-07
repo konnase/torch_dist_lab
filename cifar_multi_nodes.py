@@ -78,10 +78,7 @@ parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
 # local_rank
 parser.add_argument('--local-rank', type=int, default=0, help='Local rank')
-# worldsize
-parser.add_argument('--wz', type=int, default=1, help="worldsize")
-# gpu id
-parser.add_argument('--gpu-id', type=int, default=0, help="gpu_id")
+
 
 args = parser.parse_args()
 state = {k: v for k, v in args._get_kwargs()}
@@ -91,8 +88,16 @@ assert args.dataset == 'cifar10' or args.dataset == 'cifar100', 'Dataset can onl
 
 # Use CUDA
 use_cuda = torch.cuda.is_available()
-local_rank = 0
-gpu_id = 0
+
+# GPU allocation
+local_rank = args.local_rank
+rank = os.getenv('RANK', 0)
+world_size = os.getenv('WORLD_SIZE', 1)
+master_addr = os.getenv('MASTER_ADDR')
+master_port = os.getenv('MASTER_PORT')
+
+torch.cuda.set_device(local_rank) # 设定GPU
+torch.distributed.init_process_group(backend='nccl',init_method="tcp://{0}:{1}".format(master_addr, master_port) ,rank=local_rank, world_size=world_size)
 
 # Random seed
 if args.manualSeed is None:
@@ -102,15 +107,6 @@ torch.manual_seed(args.manualSeed)
 if use_cuda:
     torch.cuda.manual_seed_all(args.manualSeed)
 
-def my_init():
-    # GPU allocation
-    global local_rank
-    global gpu_id
-    local_rank = args.local_rank
-    world_size = args.wz
-    gpu_id = args.gpu_id
-    torch.cuda.set_device(args.gpu_id) # 设定GPU
-    torch.distributed.init_process_group(backend='nccl',init_method="tcp://210.28.134.32:29998" ,rank=local_rank, world_size=world_size)
 
 def main():
     start_epoch = args.start_epoch  # start from epoch 0 or last checkpoint epoch
@@ -177,10 +173,10 @@ def main():
     else:
         model = models.__dict__[args.arch](num_classes=num_classes)
 
-    device = torch.device('cuda', gpu_id)
+    device = torch.device('cuda', local_rank)
     model = model.to(device)
-    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu_id], output_device=gpu_id)    
-    print('Model on cuda:%d' % gpu_id)
+    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[local_rank], output_device=local_rank)    
+    print('Model on cuda:%d' % local_rank)
     cudnn.benchmark = True
     print('    Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))
     criterion = nn.CrossEntropyLoss()
@@ -207,7 +203,7 @@ def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
     for batch_idx, (inputs, targets) in enumerate(trainloader):
        
         if use_cuda:
-            inputs, targets = inputs.cuda(gpu_id), targets.cuda(gpu_id, async=True)
+            inputs, targets = inputs.cuda(local_rank), targets.cuda(local_rank, async=True)
         inputs, targets = torch.autograd.Variable(inputs), torch.autograd.Variable(targets)
 
         # compute output
@@ -237,7 +233,7 @@ def test(testloader, model, criterion, epoch, use_cuda):
 
     for batch_idx, (inputs, targets) in enumerate(testloader):
         if use_cuda:
-            inputs, targets = inputs.cuda(gpu_id), targets.cuda(gpu_id)
+            inputs, targets = inputs.cuda(local), targets.cuda(local_rank)
         inputs, targets = torch.autograd.Variable(inputs, volatile=True), torch.autograd.Variable(targets)
 
         # compute output
@@ -262,7 +258,6 @@ def adjust_learning_rate(optimizer, epoch):
 
 if __name__ == '__main__':
     start = datetime.datetime.now()
-    my_init()
     main()
     end = datetime.datetime.now()
     delta = end-start

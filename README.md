@@ -188,17 +188,13 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 horovodrun -np 4 -H localhost:4 python3.5 cifar_hor
 import torch
 import torch.distributed as dist
 
-def my_init():
-    # GPU allocation
-    global local_rank
-    global gpu_id
-    # 在使用torch.distributed.launch启动时，gpu_id就是rank
-    # 但是在多节点情况下，需要手动设置
-    world_size = args.wz
-    gpu_id = args.gpu_id
-    local_rank = args.local_rank
-    torch.cuda.set_device(gpu_id) # 设定cuda的默认GPU，每个rank不同
-    torch.distributed.init_process_group(backend='nccl',init_method="tcp://210.28.134.32:29998" ,rank=local_rank, world_size=world_size)
+# 在使用torch.distributed.launch启动时，gpu_id就是rank
+# 但是在多节点情况下，需要手动设置
+world_size = os.
+gpu_id = args.gpu_id
+local_rank = args.local_rank
+torch.cuda.set_device(gpu_id) # 设定cuda的默认GPU，每个rank不同
+torch.distributed.init_process_group(backend='nccl',init_method="tcp://210.28.134.32:29998" ,rank=local_rank, world_size=world_size)
 
 def main():
     trainset = ...
@@ -223,7 +219,6 @@ def main():
         eval...
 
 if __name__ == '__main__':
-    my_init()
     main()
 
 ```
@@ -234,13 +229,15 @@ if __name__ == '__main__':
 
 ``` shell
 #host1
-python cifar_multi_nodes.py --local-rank 0 --world-size 4 --gpu-id 2 [other args]
-python cifar_multi_nodes.py --local-rank 1 --world-size 4 --gpu-id 3 [other args]
+python -m torch.distributed.launch --nproc_per_node=2 \
+               --nnodes=2 --node_rank=0 --master_addr="master-ip" \
+               --master_port=1234 cifar_multi_nodes.py [other args]
 #host2
-python cifar_multi_nodes.py --local-rank 2 --world-size 4 --gpu-id 7 [other args]
-python cifar_multi_nodes.py --local-rank 3 --world-size 4 --gpu-id 8 [other args]
+python -m torch.distributed.launch --nproc_per_node=2 \
+               --nnodes=2 --node_rank=1 --master_addr="master-ip" \
+               --master_port=1234 cifar_multi_nodes.py [other args]
 ```
-
+`torch.distributed.launch`模块会自动在启动的每个process里面填充环境变量：`MASTER_ADDR`、`MASTER_PORT`、`WORLD_SIZE`、`RANK`、`LOCAL_RANK`，将[torch.distributed.launch.py](https://github.com/pytorch/pytorch/blob/master/torch/distributed/launch.py)
 
 
 ### Horovod 多机多卡
