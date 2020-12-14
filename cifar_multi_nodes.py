@@ -32,6 +32,7 @@ model_names = sorted(name for name in models.__dict__
 parser = argparse.ArgumentParser(description='PyTorch CIFAR10/100 Training')
 # Datasets
 parser.add_argument('-d', '--dataset', default='cifar10', type=str)
+parser.add_argument('--dataset_dir', default='./cifar', type=str)
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 # Optimization options
@@ -77,7 +78,7 @@ parser.add_argument('--manualSeed', type=int, help='manual seed')
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
 # local_rank
-parser.add_argument('--local-rank', type=int, default=0, help='Local rank')
+parser.add_argument('--local_rank', type=int, default=0, help='Local rank')
 
 
 args = parser.parse_args()
@@ -97,7 +98,7 @@ master_addr = os.getenv('MASTER_ADDR')
 master_port = os.getenv('MASTER_PORT')
 
 torch.cuda.set_device(local_rank) # 设定GPU
-torch.distributed.init_process_group(backend='nccl',init_method="tcp://{0}:{1}".format(master_addr, master_port) ,rank=local_rank, world_size=world_size)
+torch.distributed.init_process_group(backend='nccl',init_method="tcp://{0}:{1}".format(master_addr, master_port) ,rank=local_rank, world_size=int(world_size))
 
 # Random seed
 if args.manualSeed is None:
@@ -132,11 +133,11 @@ def main():
         num_classes = 100
 
 
-    trainset = dataloader(root='/data/share/cifar', train=True, download=True, transform=transform_train)
+    trainset = dataloader(root=args.dataset_dir, train=True, download=True, transform=transform_train)
     sampler = torch.utils.data.distributed.DistributedSampler(trainset)
     trainloader = data.DataLoader(dataset=trainset, batch_size=args.train_batch * dist.get_world_size(), shuffle=False, sampler=sampler)
 
-    testset = dataloader(root='/data/share/cifar', train=False, download=False, transform=transform_test)
+    testset = dataloader(root=args.dataset_dir, train=False, download=False, transform=transform_test)
     testloader = data.DataLoader(testset, batch_size=args.test_batch * dist.get_world_size(), shuffle=False, num_workers=args.workers)
 
     # Model
@@ -203,7 +204,7 @@ def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
     for batch_idx, (inputs, targets) in enumerate(trainloader):
        
         if use_cuda:
-            inputs, targets = inputs.cuda(local_rank), targets.cuda(local_rank, async=True)
+            inputs, targets = inputs.cuda(local_rank), targets.cuda(local_rank)
         inputs, targets = torch.autograd.Variable(inputs), torch.autograd.Variable(targets)
 
         # compute output

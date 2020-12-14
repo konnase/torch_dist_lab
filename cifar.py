@@ -32,6 +32,7 @@ model_names = sorted(name for name in models.__dict__
 parser = argparse.ArgumentParser(description='PyTorch CIFAR10/100 Training')
 # Datasets
 parser.add_argument('-d', '--dataset', default='cifar10', type=str)
+parser.add_argument('--dataset_dir', default='./cifar', type=str)
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 # Optimization options
@@ -125,11 +126,11 @@ def main():
         num_classes = 100
 
 
-    trainset = dataloader(root='./cifar', train=True, download=True, transform=transform_train)
+    trainset = dataloader(root=args.dataset_dir, train=True, download=True, transform=transform_train)
     sampler = torch.utils.data.distributed.DistributedSampler(trainset)
     trainloader = data.DataLoader(dataset=trainset, batch_size=args.train_batch, shuffle=False, sampler=sampler)
 
-    testset = dataloader(root='./cifar', train=False, download=False, transform=transform_test)
+    testset = dataloader(root=args.dataset_dir, train=False, download=False, transform=transform_test)
     testloader = data.DataLoader(testset, batch_size=args.test_batch, shuffle=False, num_workers=args.workers)
 
     # Model
