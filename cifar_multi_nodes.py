@@ -61,7 +61,7 @@ parser.add_argument('-c', '--checkpoint', default='checkpoint', type=str, metava
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 # Architecture
-parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet20',
+parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet',
                     choices=model_names,
                     help='model architecture: ' +
                         ' | '.join(model_names) +
@@ -96,9 +96,11 @@ rank = os.getenv('RANK', 0)
 world_size = os.getenv('WORLD_SIZE', 1)
 master_addr = os.getenv('MASTER_ADDR')
 master_port = os.getenv('MASTER_PORT')
+print("local_rank: %s, rank: %s, world_size: %s, master_addr: %s, master_port: %s" % (local_rank, rank, world_size, master_addr, master_port))
 
 torch.cuda.set_device(local_rank) # 设定GPU
-torch.distributed.init_process_group(backend='nccl',init_method="tcp://{0}:{1}".format(master_addr, master_port) ,rank=local_rank, world_size=int(world_size))
+torch.distributed.init_process_group(backend='nccl',init_method="tcp://{0}:{1}".format(master_addr, master_port) ,rank=int(rank), world_size=int(world_size))
+print("dist: local_rank: %s, world_size: %s" % (dist.get_rank(), dist.get_world_size()))
 
 # Random seed
 if args.manualSeed is None:
@@ -165,7 +167,7 @@ def main():
                     widen_factor=args.widen_factor,
                     dropRate=args.drop,
                 )
-    elif args.arch.endswith('resnet'):
+    elif args.arch.startswith('resnet'):
         model = models.__dict__[args.arch](
                     num_classes=num_classes,
                     depth=args.depth,
@@ -174,6 +176,8 @@ def main():
     else:
         model = models.__dict__[args.arch](num_classes=num_classes)
 
+
+    print('==> Model %s created' % args.arch)
     device = torch.device('cuda', local_rank)
     model = model.to(device)
     model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[local_rank], output_device=local_rank)    
@@ -234,7 +238,7 @@ def test(testloader, model, criterion, epoch, use_cuda):
 
     for batch_idx, (inputs, targets) in enumerate(testloader):
         if use_cuda:
-            inputs, targets = inputs.cuda(local), targets.cuda(local_rank)
+            inputs, targets = inputs.cuda(local_rank), targets.cuda(local_rank)
         inputs, targets = torch.autograd.Variable(inputs, volatile=True), torch.autograd.Variable(targets)
 
         # compute output

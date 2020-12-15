@@ -1,0 +1,96 @@
+apiVersion: "kubeflow.org/v1"
+kind: "PyTorchJob"
+metadata:
+  name: "pytorch-cifar-ddp"
+  # generateName: "pytorch-cifar-ddp-"
+spec:
+  # priorityClassName: high-priority
+  # preemptible: true
+  # topologyGPU: true
+  # useSpot: true
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1 # must be 1
+      restartPolicy: Never
+      template:
+        spec:
+          schedulerName: phoenix-rubber
+          containers:
+            - name: pytorch
+              image: registry.sensetime.com/cloudnative4ai/pytorch/cifar-ddp:latest
+              imagePullPolicy: Always
+              env:
+                - name: NCCL_DEBUG
+                  value: "INFO"
+                - name: NCCL_IB_HCA
+                  value: "mlx5_0:1"
+                - name: LC_ALL
+                  value: "en_US.UTF-8"
+                - name: LANG
+                  value: "en_US.UTF-8"
+                - name: USER
+                  value: "liqingping"
+              command: ["python3"]
+              args: ["-m", "torch.distributed.launch", 
+              "--nproc_per_node=2", "--nnodes=2", "--node_rank=0", 
+              "--master_addr=pytorch-cifar-ddp-master-0", 
+              "--master_port=23456",
+              "cifar.py", "--arch=resnet"]
+              resources: 
+                limits:
+                  cpu: 8
+                  memory: 10Gi
+                  nvidia.com/gpu: 2
+              workingDir: /torch-dist/cifar
+              volumeMounts:
+              - mountPath: /dev/shm
+                name: cache-volume
+          volumes:
+          - name: cache-volume
+            emptyDir:
+              medium: Memory
+              sizeLimit: 2Gi
+    Worker:
+      replicas: 1
+      restartPolicy: Never
+      template:
+        spec:
+          schedulerName: phoenix-rubber
+          containers:
+            - name: pytorch
+              image: registry.sensetime.com/cloudnative4ai/pytorch/cifar-ddp:latest
+              imagePullPolicy: Always
+              env:
+                - name: NCCL_DEBUG
+                  value: "INFO"
+                - name: NCCL_IB_HCA
+                  value: "mlx5_0:1"
+                - name: LC_ALL
+                  value: "en_US.UTF-8"
+                - name: LANG
+                  value: "en_US.UTF-8"
+                - name: USER
+                  value: "liqingping"
+              command: ["python3"]
+              args: ["-m", "torch.distributed.launch", 
+              "--nproc_per_node=2", "--nnodes=2", "--node_rank=1", 
+              "--master_addr=pytorch-cifar-ddp-master-0", 
+              "--master_port=23456",
+              "cifar.py", "--arch=resnet"]
+              resources: 
+                limits:
+                  cpu: 8
+                  memory: 10Gi
+                  nvidia.com/gpu: 2
+              workingDir: /torch-dist/cifar
+              volumeMounts:
+              - mountPath: /dev/shm
+                name: cache-volume
+          volumes:
+          - name: cache-volume
+            emptyDir:
+              medium: Memory
+              sizeLimit: 2Gi
+
+# python -m torch.distributed.launch --nproc_per_node=2 --nnodes=2 --node_rank=0 --master_addr="10.5.8.228" --master_port=12346 cifar.py --arch resnet
+# python -m torch.distributed.launch --nproc_per_node=2 --nnodes=2 --node_rank=1 --master_addr="10.5.8.228" --master_port=12346 cifar.py --arch resnet
