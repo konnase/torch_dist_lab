@@ -184,44 +184,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 horovodrun -np 4 -H localhost:4 python3.5 cifar_hor
 
 代码模式：
 
-``` python
-import torch
-import torch.distributed as dist
-
-# 在使用torch.distributed.launch启动时，gpu_id就是rank
-# 但是在多节点情况下，需要手动设置
-world_size = os.
-gpu_id = args.gpu_id
-local_rank = args.local_rank
-torch.cuda.set_device(gpu_id) # 设定cuda的默认GPU，每个rank不同
-torch.distributed.init_process_group(backend='nccl',init_method="tcp://210.28.134.32:29998" ,rank=local_rank, world_size=world_size)
-
-def main():
-    trainset = ...
-    sampler = torch.utils.data.distributed.DistributedSampler(trainset)
-    trainloader = data.DataLoader(dataset=trainset, batch_size=args.train_batch * dist.get_world_size(), shuffle=False, sampler=sampler)
-    testset = ...
-    testloader = data.DataLoader(testset, batch_size=args.test_batch * dist.get_world_size(), shuffle=False, num_workers=args.workers)
-
-    # Model
-    
-		model = ...
-    device = torch.device('cuda', gpu_id)
-    model = model.to(device)
-    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu_id], output_device=gpu_id)    
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-
-
-    # Train and val
-    for epoch in range(start_epoch, args.epochs):
-        train...
-        eval...
-
-if __name__ == '__main__':
-    main()
-
-```
+同DDP(单机多卡)，同样是通过环境变量初始化torch.distributed
 
 训练启动：
 
@@ -231,13 +194,13 @@ if __name__ == '__main__':
 #host1
 python -m torch.distributed.launch --nproc_per_node=2 \
                --nnodes=2 --node_rank=0 --master_addr="master-ip" \
-               --master_port=1234 cifar_multi_nodes.py [other args]
+               --master_port=1234 cifar.py [other args]
 #host2
 python -m torch.distributed.launch --nproc_per_node=2 \
                --nnodes=2 --node_rank=1 --master_addr="master-ip" \
-               --master_port=1234 cifar_multi_nodes.py [other args]
+               --master_port=1234 cifar.py [other args]
 ```
-`torch.distributed.launch`模块会自动在启动的每个process里面填充环境变量：`MASTER_ADDR`、`MASTER_PORT`、`WORLD_SIZE`、`RANK`、`LOCAL_RANK`，将[torch.distributed.launch.py](https://github.com/pytorch/pytorch/blob/master/torch/distributed/launch.py)
+`torch.distributed.launch`模块会自动在启动的每个process里面填充环境变量：`MASTER_ADDR`、`MASTER_PORT`、`WORLD_SIZE`、`RANK`，如果设置参数`--use-env=true`的话，用户代码中将不需要设置`--local_rank`参数，`torch.distributed.launch`模块将为每个rank自动设置`LOCAL_RANK`环境变量，该环境变量用来表示每台机器上的本地rank编号。见[torch.distributed.launch.py](https://github.com/pytorch/pytorch/blob/master/torch/distributed/launch.py)
 
 
 ### Horovod 多机多卡
@@ -256,4 +219,4 @@ CUDA_VISIBLE_DEVICES=0,1 horovodrun -np 4 -H host1:2,host2:2 python cifar_horovo
 
 ![image](./doc/fig4.png)
 
-经过测试发现，多台机器之间训练的速度非常慢，对于参数较多的模型，速度比单机还要慢，可能是受限于网络的传输速度。
+测试单机4卡和双机4卡训练的加速比，经过测试发现，多台机器之间训练的速度非常慢，对于参数较多的模型，速度比单机还要慢，可能是受限于网络的传输速度。
