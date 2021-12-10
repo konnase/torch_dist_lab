@@ -100,7 +100,15 @@ if use_cuda:
 # GPU allocation
 local_rank = args.local_rank
 torch.cuda.set_device(local_rank) # 设定cuda的默认GPU，每个rank不同
-torch.distributed.init_process_group(backend='nccl',init_method="env://")
+print("Using distributed PyTorch with nccl backend")
+try:
+    torch.distributed.init_process_group(backend='nccl', init_method="env://")
+except ValueError as e:
+    print("ValueError: {}".format(e))
+    exit(128)
+except Exception as e:
+    print("Exception: {}".format(e))
+    exit(128)
 
 def main():
     start_epoch = args.start_epoch  # start from epoch 0 or last checkpoint epoch
@@ -169,7 +177,7 @@ def main():
 
     device = torch.device('cuda', local_rank)
     model = model.to(device)
-    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[local_rank], output_device=local_rank)    
+    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[local_rank], output_device=local_rank)
     print('Model on cuda:%d' % local_rank)
     cudnn.benchmark = True
     print('    Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))
@@ -182,10 +190,10 @@ def main():
         adjust_learning_rate(optimizer, epoch)
         train_loss, train_acc = train(trainloader, model, criterion, optimizer, epoch, use_cuda)
         test_loss, test_acc = test(testloader, model, criterion, epoch, use_cuda)
-        print('Rank:{} Epoch[{}/{}]: LR: {:.3f}, Train loss: {:.5f}, Test loss: {:.5f}, Train acc: {:.2f}, Test acc: {:.2f}.'.format(dist.get_rank(),epoch+1, args.epochs, state['lr'], 
+        print('Rank:{} Epoch[{}/{}]: LR: {:.3f}, Train loss: {:.5f}, Test loss: {:.5f}, Train acc: {:.2f}, Test acc: {:.2f}.'.format(dist.get_rank(),epoch+1, args.epochs, state['lr'],
         train_loss, test_loss, train_acc, test_acc))
         # print('Rank:{} Epoch[{}/{}]: LR: {:.3f}, Train loss: {:.5f}, Train acc: {:.2f}'.format(dist.get_rank(),epoch+1, args.epochs, state['lr'],train_loss, train_acc))
-        
+
 
 def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
     # switch to train mode

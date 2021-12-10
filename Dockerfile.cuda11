@@ -1,5 +1,5 @@
 # FROM horovod/horovod:0.19.3-tf2.1.0-torch-mxnet1.6.0-py3.6-gpu
-FROM registry.sensetime.com/cloudnative4ai/baseimages/pytorch:1.5.1-cuda10.1-devel-cudnn7.5-nccl2.7.8-py3.6-centos7.8
+FROM registry.sensetime.com/cloudnative4ai/pytorch:1.7.1-cuda11.0-cudnn8-devel-centos7
 LABEL maintainer="liqinping@sensetime.com" 
 
 RUN mkdir -p /torch-dist/cifar && mkdir -p /torch-dist/cifar/cifar
@@ -14,4 +14,4 @@ ADD cifar_multi_nodes.py cifar_multi_nodes.py
 ADD cifar.py cifar.py
 
 RUN chmod -R 0777 /torch-dist/cifar
-# docker build -t registry.sensetime.com/cloudnative4ai/pytorch/cifar-ddp:latest .
+# docker build -t registry.sensetime.com/cloudnative4ai/pytorch/cifar-ddp:cuda11.0 -f Dockerfile.cuda11 .
